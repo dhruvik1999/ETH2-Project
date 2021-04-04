@@ -180,6 +180,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         return true;
     }
     
+    
     function propose( address fToken, address tToken, uint256 per ) public{
         bool check1=false;
         bool check2=false;
@@ -193,21 +194,21 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         }
         require( (check2&&check1)==true , 'Token does not exist in portfolio!!!' );
         require( per > 0 , "% should be more than 0" );
-        
-        Proposal storage p;
-        p.fromToken=fToken;
-        p.toToken=tToken;
-        p.perc=per;
-        p.initiator=msg.sender;
-        p.agree=1;
-        p.disagree=0;
-        
-        // = Proposal(fToken,tToken,per,msg.sender,1,0);
-        
+
+      
         ttlproposals+=1;
-        proposals[ttlproposals]=p;
+        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,1,0);
+   
     }
- 
+    
+    function voteForProposal(uint256 proposalId, bool vote) public{
+        if(vote==true)
+            proposals[proposalId].agree+= balanceOf(msg.sender) ;
+        else
+            proposals[proposalId].disagree+= balanceOf(msg.sender) ;
+        
+    }
+    
     
     function totalSupply() public constant returns (uint) {
         return _totalSupply;
