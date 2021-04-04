@@ -106,6 +106,21 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
     mapping( address => IERC20 ) DPOtokens;
     
     
+    //Proposal 
+    struct Proposal{
+        address fromToken;
+        address toToken;
+        uint256 perc;
+        address initiator;
+        
+        uint256 agree;
+        uint256 disagree;
+    }
+    
+    uint256 public ttlproposals;
+    mapping( uint256 => Proposal ) public proposals;
+    
+    
     constructor( address[] tkns, uint256[] amnt ) public{
         
         symbol = "DPO";
@@ -122,6 +137,8 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
              asset[ tkns[i] ] =0;
              DPOtokens[ tkns[i] ] = IERC20( tkns[i] );
         }
+        
+        ttlproposals=0;
         
     }
     
@@ -162,6 +179,33 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         return true;
     }
     
+    function propose( address fToken, address tToken, uint256 per ) public{
+        bool check1=false;
+        bool check2=false;
+        for(uint i=0;i<numTokens;i++){
+            if( tokensAddr[i]==fToken ){
+                check1=true;
+            }
+            if( tokensAddr[i]==tToken ){
+                check2=true;
+            }
+        }
+        require( (check2&&check1)==true , 'Token does not exist in portfolio!!!' );
+        require( per > 0 , "% should be more than 0" );
+        
+        Proposal memory p = Proposal(fToken,tToken,per,msg.sender,1,0);
+        
+        ttlproposals+=1;
+        proposals[ttlproposals]=p;
+    }
+    
+    function voteForProposal(uint256 proposalId, bool vote) public{
+        if(vote==true)
+            proposals[proposalId].agree+= balanceOf(msg.sender) ;
+        else
+            proposals[proposalId].disagree+= balanceOf(msg.sender) ;
+        
+    }
     
     function totalSupply() public constant returns (uint) {
         return _totalSupply;
