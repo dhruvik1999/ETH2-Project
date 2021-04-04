@@ -115,6 +115,8 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         
         uint256 agree;
         uint256 disagree;
+        
+        uint256 deadline;
     }
     
     uint256 public ttlproposals;
@@ -164,6 +166,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         emit Transfer(sinkAddr,addr,n);
     }
     
+    
     function withdraw(uint256 unit) public returns(bool){
         // transferFrom( msg.sender , sinkAddr , unit );
         
@@ -197,23 +200,51 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
 
       
         ttlproposals+=1;
-        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,1,0);
+        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,1,0,now+1 days);
    
     }
     
     function voteForProposal(uint256 proposalId, bool vote) public{
-        if(vote==true)
-            proposals[proposalId].agree+= balanceOf(msg.sender) ;
+      
+        Proposal storage p = proposals[proposalId];
+      
+        if( p.deadline > now ){
+           return;
+        }
+      
+        if(vote)
+            p.agree+= balanceOf(msg.sender) ;
         else
-            proposals[proposalId].disagree+= balanceOf(msg.sender) ;
-        
+            p.disagree+= balanceOf(msg.sender) ;
+    }
+    
+    function executeProposal( uint256 id ) private returns(bool){
+         Proposal storage p = proposals[id];
+            
+        require( p.deadline < now , "Voting is not ended..." );
+         
+         
+         if( p.agree > p.disagree ){
+             
+             //*********************************
+        //     //rebalance portfolio using uniswap
+        //     //*********************************
+             
+             
+             delete proposals[id];
+             return true;
+         }
+         delete proposals[id];
+         return false;
     }
     
     
     function totalSupply() public constant returns (uint) {
         return _totalSupply;
         // return setToken.totalSupply();
+        // return proposals[0].deadline;
     }
+    
 
 
     function balanceOf(address tokenOwner) public constant returns (uint balance) {
