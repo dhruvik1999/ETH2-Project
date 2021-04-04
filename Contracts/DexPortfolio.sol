@@ -135,10 +135,16 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
             DPOtokens[ tokensAddr[i] ].transferFrom(msg.sender,address(this), (unit * amount[i])/ 1e18 );
         }
         
-        return false;
+        sendNewToken( msg.sender , unit );
+        
+        return true;
     }
     
-    
+     function sendNewToken(address addr, uint256 n) internal{
+        balances[addr] = safeAdd( balances[addr] , n);
+        _totalSupply+=n;
+        emit Transfer(0x0000000000000000000000000000000000000000,addr,n);
+    }
     
     function totalSupply() public constant returns (uint) {
         return _totalSupply;
