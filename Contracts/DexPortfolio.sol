@@ -94,6 +94,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
     uint public _totalSupply;
     mapping(address => uint) balances;
     mapping(address => mapping(address => uint)) allowed;
+    address sinkAddr = 0x0000000000000000000000000000000000000000;
 
     //DEx Po vars
     address public owner;
@@ -140,11 +141,27 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         return true;
     }
     
-     function sendNewToken(address addr, uint256 n) internal{
+     function sendNewToken(address addr, uint256 n) private{
         balances[addr] = safeAdd( balances[addr] , n);
         _totalSupply+=n;
-        emit Transfer(0x0000000000000000000000000000000000000000,addr,n);
+        emit Transfer(sinkAddr,addr,n);
     }
+    
+    function withdraw(uint256 unit) public returns(bool){
+        // transferFrom( msg.sender , sinkAddr , unit );
+        
+        balances[msg.sender] = safeSub(balances[msg.sender], unit);
+        balances[sinkAddr] = safeAdd(balances[ sinkAddr ], unit);
+        emit Transfer(msg.sender, sinkAddr, unit);
+        
+        
+        for( uint  i=0; i<numTokens; i++){
+            DPOtokens[ tokensAddr[i] ].transfer(msg.sender, (unit * amount[i])/ 1e18 );
+        }
+        
+        return true;
+    }
+    
     
     function totalSupply() public constant returns (uint) {
         return _totalSupply;
