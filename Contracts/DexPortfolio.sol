@@ -94,7 +94,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
     uint public _totalSupply;
     mapping(address => uint) balances;
     mapping(address => mapping(address => uint)) allowed;
-    address sinkAddr = 0x0000000000000000000000000000000000000000;
+    address sinkAddr;
 
     //DEx Po vars
     address public owner;
@@ -137,10 +137,11 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         
         for(uint i=0;i<numTokens;i++){
              asset[ tkns[i] ] =0;
-             DPOtokens[ tkns[i] ] = IERC20( tkns[i] );
+            DPOtokens[ tkns[i] ] = IERC20( tkns[i] );
         }
         
         ttlproposals=0;
+        sinkAddr =  0x0000000000000000000000000000000000000000;
         
     }
     
@@ -185,8 +186,10 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
     
     
     function propose( address fToken, address tToken, uint256 per ) public{
+         require(per>50,"Should be");
         bool check1=false;
         bool check2=false;
+       
         for(uint i=0;i<numTokens;i++){
             if( tokensAddr[i]==fToken ){
                 check1=true;
@@ -200,7 +203,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
 
       
         ttlproposals+=1;
-        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,1,0,now+1 days);
+        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,balanceOf(msg.sender),0,now+1 days);
    
     }
     
@@ -208,9 +211,7 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
       
         Proposal storage p = proposals[proposalId];
       
-        if( p.deadline > now ){
-           return;
-        }
+       require( p.deadline > now , "Voting is ended..." );
       
         if(vote)
             p.agree+= balanceOf(msg.sender) ;
@@ -226,9 +227,9 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
          
          if( p.agree > p.disagree ){
              
-             //*********************************
-        //     //rebalance portfolio using uniswap
-        //     //*********************************
+              //*********************************
+             //rebalance portfolio using uniswap
+            //*********************************
              
              
              delete proposals[id];
@@ -286,9 +287,9 @@ contract DexPortfolio  is ERC20Interface, Owned, SafeMath {
         return true;
     }
 
-    function () public payable {
-        revert();
-    }
+    // function () public payable {
+    //     revert();
+    // }
 
 
     function transferAnyERC20Token(address tokenAddress, uint tokens) public onlyOwner returns (bool success) {
