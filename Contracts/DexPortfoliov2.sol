@@ -237,7 +237,6 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
     address[] public tokensAddr;
     uint256[] public amount;
     uint numTokens;
-    mapping( address => uint256 ) public asset;
    
     mapping( address => IERC20 ) DPOtokens;
     
@@ -255,6 +254,8 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
         uint256 disagree;
         
         uint256 deadline;
+        
+        mapping(address=>bool) voted;
     }
     
     uint256 public ttlproposals;
@@ -274,7 +275,6 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
         numTokens = tkns.length;
         
         for(uint i=0;i<numTokens;i++){
-             asset[ tkns[i] ] =0;
             DPOtokens[ tkns[i] ] = IERC20( tkns[i] );
         }
         
@@ -285,15 +285,10 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
         
     }
     
-    // function checkIssue(uint256 i) private returns(bool){
-        
-    //     return false;
-    // }
-    
     function issue( uint256 unit ) public returns(bool) {
         
         for( uint  i=0; i<numTokens; i++){
-            DPOtokens[ tokensAddr[i] ].transferFrom(msg.sender,address(this), (unit * amount[i])/ 1e18 );
+            DPOtokens[ tokensAddr[i] ].transferFrom(msg.sender,address(this), safeDiv( safeMul( unit , amount[i] )  , 1e18 ) );
         }
         
         sendNewToken( msg.sender , unit );
@@ -313,20 +308,22 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
         
         balances[msg.sender] = safeSub(balances[msg.sender], unit);
         balances[sinkAddr] = safeAdd(balances[ sinkAddr ], unit);
-        _totalSupply-=unit;
+        
         emit Transfer(msg.sender, sinkAddr, unit);
         
         
         for( uint  i=0; i<numTokens; i++){
-            DPOtokens[ tokensAddr[i] ].transfer(msg.sender, (unit * amount[i])/ 1e18 );
+            DPOtokens[ tokensAddr[i] ].transfer(msg.sender, safeDiv( safeMul( unit , amount[i] )  , 1e18 ) );
         }
+        
+        _totalSupply-=unit;
         
         return true;
     }
     
     
-    function propose( address fToken, address tToken, uint256 per ) public{
-         require(per>50,"Should be");
+    function propose( address fToken, address tToken, uint256 per, uint256 deadline ) public{
+
         bool check1=false;
         bool check2=false;
        
@@ -343,7 +340,7 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
 
       
         ttlproposals+=1;
-        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,balanceOf(msg.sender),0,now+1 days);
+        proposals[ttlproposals] = Proposal(fToken,tToken,per,msg.sender,0,0,now+deadline);
    
     }
     
@@ -352,15 +349,20 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
         Proposal storage p = proposals[proposalId];
       
        require( p.deadline > now , "Voting is ended..." );
+       require( p.voted[msg.sender]==false,"You can vote only once" );
       
         if(vote)
             p.agree+= balanceOf(msg.sender) ;
         else
             p.disagree+= balanceOf(msg.sender) ;
+        
+        p.voted[msg.sender]=true;
     }
     
-    function executeProposal( uint256 id ) private returns(bool){
+    function executeProposal( uint256 id ) public returns(bool){
          Proposal storage p = proposals[id];
+         
+         require( msg.sender==p.initiator , "Only initiator can execute proposal..." );
             
         require( p.deadline < now , "Voting is not ended..." );
          
@@ -371,9 +373,20 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
              //rebalance portfolio using uniswap
             //*********************************
             //  uni.swapExactTokensForTokens(p.perc/100*assets[p.fromToken],0,[p.fromToken,p.toToken],owner,now+1 days);
-             uint256  amountToSwap = 1000 ;
              
              
+             uint256  amountToSwap = (p.perc*DPOtokens[p.fromToken].balanceOf( address(this) ))/100;
+             DPOtokens[p.fromToken].approve( unirouter , amountToSwap );
+             
+            address[] memory add = new address[](2);
+            add[0] = p.fromToken;
+            add[1] = p.toToken;
+            
+            uni.swapExactTokensForTokens(amountToSwap,10,add,address(this),now+1 hours);
+            
+            for(uint i=0;i<numTokens;i++){
+                amount[i] = (DPOtokens[ tokensAddr[i] ].balanceOf( address(this)) * 1e18 )/_totalSupply;
+            }
              
              delete proposals[id];
              return true;
@@ -383,10 +396,8 @@ contract DexPortfolio is ERC20Interface, Owned, SafeMath {
     }
     
     
-     function  totalSupply() override public  returns (uint) {
+     function  totalSupply() override public returns (uint) {
         return _totalSupply;
-        // return setToken.totalSupply();
-        // return proposals[0].deadline;
     }
     
 
